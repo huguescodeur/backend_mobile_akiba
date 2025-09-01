@@ -31,6 +31,10 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 import requests
 import logging
 
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
 
 # Create your views here.
 
@@ -271,6 +275,47 @@ def create_pin(request):
     }, status=status.HTTP_400_BAD_REQUEST)
 
 
+# @api_view(['POST'])
+# @permission_classes([IsAuthenticated])
+# def verify_pin(request):
+#     """
+#     Vérifier le code PIN pour l'authentification rapide
+#     """
+#     serializer = VerifyPinSerializer(data=request.data)
+    
+#     if serializer.is_valid():
+#         pin_code = serializer.validated_data['pin_code']
+        
+#         user = request.user
+        
+#         if not user.has_pin_code:
+#             return Response({
+#                 'success': False,
+#                 'message': 'Aucun code PIN configuré'
+#             }, status=status.HTTP_400_BAD_REQUEST)
+        
+#         if user.check_pin_code(pin_code):
+#             user.update_pin_entry_time()
+            
+#             return Response({
+#                 'success': True,
+#                 'message': 'Code PIN vérifié avec succès'
+#             }, status=status.HTTP_200_OK)
+#         else:
+#             return Response({
+#                 'success': False,
+#                 'message': 'Code PIN incorrect'
+#             }, status=status.HTTP_400_BAD_REQUEST)
+    
+#     errors = serializer.errors
+#     first_key = next(iter(errors))
+#     first_error = errors[first_key][0] if isinstance(errors[first_key], list) else errors[first_key]
+#     return Response({
+#         'success': False,
+#         'errors': serializer.errors,
+#         'message': first_error
+#     }, status=status.HTTP_400_BAD_REQUEST)
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def verify_pin(request):
@@ -281,7 +326,6 @@ def verify_pin(request):
     
     if serializer.is_valid():
         pin_code = serializer.validated_data['pin_code']
-        
         user = request.user
         
         if not user.has_pin_code:
@@ -291,7 +335,8 @@ def verify_pin(request):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         if user.check_pin_code(pin_code):
-            user.update_pin_entry_time()
+            # Utiliser la nouvelle méthode pour réinitialiser
+            user.reset_pin_requirement()
             
             return Response({
                 'success': True,
@@ -313,23 +358,52 @@ def verify_pin(request):
     }, status=status.HTTP_400_BAD_REQUEST)
 
 
+
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def auth_status(request):
+#     """Vérifie l'état de connexion et si le code PIN est configuré"""
+#     user = request.user
+    
+#     should_require_pin = user.should_require_pin()
+    
+#     if user.requires_pin_auth != should_require_pin:
+#         user.requires_pin_auth = should_require_pin
+#         user.save(update_fields=['requires_pin_auth'])
+    
+#     response_data = {
+#         'success': True,
+#         'has_pin_code': user.has_pin_code,
+#         'user_id': user.id,
+#         'requires_pin_auth': user.should_require_pin(), 
+#     }
+#     return Response(response_data, status=status.HTTP_200_OK)
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def auth_status(request):
     """Vérifie l'état de connexion et si le code PIN est configuré"""
     user = request.user
     
-    should_require_pin = user.should_require_pin()
+    print(f"[AUTH STATUS] User: {user.phone_number}")
+    print(f"[AUTH STATUS] Last PIN entry: {user.last_pin_entry}")
+    print(f"[AUTH STATUS] Last background time: {user.last_background_time}")
+    print(f"[AUTH STATUS] Current requires_pin_auth: {user.requires_pin_auth}")
     
+    should_require_pin = user.should_require_pin()
+    print(f"[AUTH STATUS] Should require PIN: {should_require_pin}")
+    
+    # Mise à jour du statut si nécessaire
     if user.requires_pin_auth != should_require_pin:
         user.requires_pin_auth = should_require_pin
         user.save(update_fields=['requires_pin_auth'])
+        print(f"[AUTH STATUS] Updated requires_pin_auth to: {should_require_pin}")
     
     response_data = {
         'success': True,
         'has_pin_code': user.has_pin_code,
         'user_id': user.id,
-        'requires_pin_auth': user.should_require_pin(), 
+        'requires_pin_auth': should_require_pin,  # Utiliser la valeur calculée
     }
     return Response(response_data, status=status.HTTP_200_OK)
 
@@ -415,6 +489,15 @@ def login(request):
         print(f"Phone Number: {phone_number}")
         print(f"Password: {password}")
         
+        # Vérifier si l'utilisateur existe avant d'authentifier
+        user_exists = User.objects.filter(username=phone_number).exists()
+        
+        if not user_exists:
+            return Response({
+                'success': False,
+                'message': 'Utilisateur non trouvé'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         user = authenticate(username=phone_number, password=password)
         
         if user:
@@ -449,7 +532,7 @@ def login(request):
                 'success': False,
                 'message': 'Identifiants incorrects'
             }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     errors = serializer.errors
     first_key = next(iter(errors))
     first_error = errors[first_key][0] if isinstance(errors[first_key], list) else errors[first_key]
@@ -458,6 +541,8 @@ def login(request):
         'errors': serializer.errors,
         'message': first_error
     }, status=status.HTTP_400_BAD_REQUEST)
+
+    
 
 
 @api_view(['GET'])

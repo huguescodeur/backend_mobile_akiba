@@ -31,6 +31,8 @@ class PinAuthMiddleware(MiddlewareMixin):
         '/api/accounts/update-background-time/',
         '/api/accounts/token/refresh/',
         '/admin/',
+        '/api/accounts/profile/',
+        # '/api/wallet/deposit/',
     ]
     
     def process_request(self, request):

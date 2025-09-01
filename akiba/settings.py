@@ -33,6 +33,8 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+ASGI_APPLICATION = "akiba.asgi.application"
+
 ALLOWED_HOSTS = ['*']
 CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:8000',
@@ -52,12 +54,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'core',
     'accounts',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'sanek_wallet.apps.SanekWalletConfig',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -74,6 +77,18 @@ MIDDLEWARE = [
     'accounts.middleware.SecurityHeadersMiddleware',
 
 ]
+
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        
+    },
+    
+}
+# 'CONFIG': {
+        #     "hosts": [('127.0.0.1', 6379)],
+        # },
 
 
 
@@ -93,7 +108,7 @@ LOGGING = {
         },
     },
     'loggers': {
-        'votre_app': {
+        '': {
             'handlers': ['file', 'console'],
             'level': 'INFO',
             'propagate': True,
@@ -151,8 +166,8 @@ MTARGET_URL = os.getenv('MTARGET_URL')
 
 # ? Configuration JWT
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),  # Token d'accès valide 1 jour
-    'REFRESH_TOKEN_LIFETIME': timedelta(minutes=30),  # Token de rafraîchissement valide 30 jours
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1), 
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),  
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',

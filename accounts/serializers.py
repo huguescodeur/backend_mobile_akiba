@@ -52,8 +52,8 @@ class VerifyPhoneSerializer(serializers.Serializer):
 
 class CreatePinSerializer(serializers.Serializer):
     """Serializer pour la création du code PIN"""
-    pin_code = serializers.CharField(max_length=6, required=True)
-    confirm_pin_code = serializers.CharField(max_length=6, required=True)
+    pin_code = serializers.CharField(max_length=5, required=True)
+    confirm_pin_code = serializers.CharField(max_length=5, required=True)
     
     def validate_pin_code(self, value):
         """Valider que le code PIN contient exactement 4 chiffres"""
@@ -64,8 +64,8 @@ class CreatePinSerializer(serializers.Serializer):
         if not value.isdigit():
             raise serializers.ValidationError("Le code PIN doit contenir uniquement des chiffres")
 
-        if len(value) != 4:
-            raise serializers.ValidationError("Le code PIN doit contenir exactement 4 chiffres")
+        if len(value) != 5:
+            raise serializers.ValidationError("Le code PIN doit contenir exactement 5 chiffres")
 
         return value
     
@@ -91,9 +91,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer pour le profil utilisateur"""
     class Meta:
         model = CustomUser
-        fields = ['id', 'full_name', 'phone_number', 'profile_picture', 
+        fields = ['id', 'uuid', 'full_name', 'phone_number', 'profile_picture', 
                  'is_phone_verified', 'has_pin_code', 'date_joined']
-        read_only_fields = ['id', 'phone_number', 'is_phone_verified', 
+        read_only_fields = ['id', 'uuid', 'phone_number', 'is_phone_verified', 
                            'has_pin_code', 'date_joined']
 
 

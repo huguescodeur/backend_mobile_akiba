@@ -4,9 +4,11 @@ from django.utils import timezone
 from datetime import timedelta
 import random
 import string
+import uuid
 
 # Create your models here.
 class CustomUser(AbstractUser):
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     phone_number = models.CharField(max_length=20, unique=True)
     full_name = models.CharField(max_length=255)
     is_phone_verified = models.BooleanField(default=False)
@@ -42,59 +44,63 @@ class CustomUser(AbstractUser):
         self.requires_pin_auth = False
         self.save()
         
-    def should_require_pin(self):
-        if not self.has_pin_code:
-            print("[PIN CHECK] L'utilisateur n’a pas encore de code PIN.")
-            return True
-
-        if not self.last_pin_entry:
-            print("[PIN CHECK] Aucune entrée PIN enregistrée précédemment pour le last pin entry.")
-            return True
-
-        if not self.last_background_time:
-            print("[PIN CHECK] Aucune entrée PIN enregistrée précédemment pour last background.")
-            return False  # Pas encore passé en arrière-plan
-
-        time_diff = timezone.now() - self.last_background_time
-        print(f"[PIN CHECK] Depuis arrière-plan : {time_diff}")
-
-        # Vérifie seulement le temps hors app (pas dans l'app)
-        if time_diff > timedelta(minutes=1):  # ou 5 minutes selon ton besoin
-            print("[PIN CHECK] + de 1 minute écoulée → demander de nouveau le PIN.")
-            return True
-        
-        print("[PIN CHECK] Moins d’1 minute écoulée → accès autorisé.")
-
-        return False
-
-        
     # def should_require_pin(self):
     #     if not self.has_pin_code:
     #         print("[PIN CHECK] L'utilisateur n’a pas encore de code PIN.")
     #         return True
 
     #     if not self.last_pin_entry:
-    #         print("[PIN CHECK] Aucune entrée PIN enregistrée précédemment.")
+    #         print("[PIN CHECK] Aucune entrée PIN enregistrée précédemment pour le last pin entry.")
     #         return True
 
-    #     time_diff = timezone.now() - self.last_pin_entry
-    #     print(f"[PIN CHECK] Temps depuis dernière saisie PIN : {time_diff}")
+    #     if not self.last_background_time:
+    #         print("[PIN CHECK] Aucune entrée PIN enregistrée précédemment pour last background.")
+    #         return False  # Pas encore passé en arrière-plan
 
-    #     if time_diff > timedelta(minutes=1):
+    #     time_diff = timezone.now() - self.last_background_time
+    #     print(f"[PIN CHECK] Depuis arrière-plan : {time_diff}")
+
+    #     # Vérifie seulement le temps hors app (pas dans l'app)
+    #     if time_diff > timedelta(minutes=1):  # ou 5 minutes selon ton besoin
     #         print("[PIN CHECK] + de 1 minute écoulée → demander de nouveau le PIN.")
     #         return True
-
-    #     print("[PIN CHECK] Moins d’1 minute écoulée → accès autorisé.")
-    #     return False
-
-    
-    # def should_require_pin(self):
-    #     """Vérifier si l'utilisateur doit ressaisir son PIN (après 1 minute d'inactivité)"""
-    #     if not self.has_pin_code or not self.last_pin_entry:
-    #         return True
         
-    #     time_diff = timezone.now() - self.last_pin_entry
-    #     return time_diff > timedelta(minutes=1)
+    #     print("[PIN CHECK] Moins d’1 minute écoulée → accès autorisé.")
+
+    #     return False
+    
+    def should_require_pin(self):
+        if not self.has_pin_code:
+            print("[PIN CHECK] L'utilisateur n'a pas encore de code PIN.")
+            return True
+
+        if not self.last_pin_entry:
+            print("[PIN CHECK] Aucune entrée PIN enregistrée précédemment.")
+            return True
+
+        # Utiliser last_pin_entry au lieu de last_background_time
+        # Car c'est le moment où l'utilisateur a entré son PIN pour la dernière fois
+        time_since_pin = timezone.now() - self.last_pin_entry
+        print(f"[PIN CHECK] Temps depuis dernière saisie PIN : {time_since_pin}")
+
+        # Si plus d'1 minute depuis la dernière saisie PIN ET que l'utilisateur a été en arrière-plan
+        if self.last_background_time and time_since_pin > timedelta(minutes=1):
+            # Vérifier si l'utilisateur a été en arrière-plan après la dernière saisie PIN
+            if self.last_background_time > self.last_pin_entry:
+                print("[PIN CHECK] Utilisateur en arrière-plan après PIN → demander PIN.")
+                return True
+        
+        print("[PIN CHECK] PIN toujours valide.")
+        return False
+    
+    
+    def reset_pin_requirement(self):
+        """Réinitialise l'exigence PIN après une saisie correcte"""
+        self.last_pin_entry = timezone.now()
+        self.requires_pin_auth = False
+        self.save(update_fields=['last_pin_entry', 'requires_pin_auth'])
+        print(f"[PIN RESET] PIN requirement reset at {self.last_pin_entry}")
+
 
 
 class PhoneVerification(models.Model):
