@@ -1,0 +1,13 @@
+daphne -b 0.0.0.0 -p 8000 akiba.asgi:application
+
+Dockerfile, requirements.txt: docker-compose down (-v optionnel) && docker-compose build && docker-compose up -d
+
+docker-compose.yml: docker-compose up -d
+
+code Python: docker-compose restart daphne worker
+
+Log server Django daphne: docker-compose logs -f daphne
+
+Log Worker: docker-compose logs -f worker
+
+Log Redis: docker-compose logs -f redis

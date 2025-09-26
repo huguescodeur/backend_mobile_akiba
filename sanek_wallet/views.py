@@ -31,7 +31,7 @@ def send_wallet_update(user, wallet_data=None, transaction_data=None):
                     "data": wallet_data
                 }
             )
-            logger.info(f"✅ Wallet update envoyé pour user {user.id}")
+            logger.info(f" Wallet update envoyé pour user {user.id}")
         
         if transaction_data:
             async_to_sync(channel_layer.group_send)(
@@ -41,10 +41,29 @@ def send_wallet_update(user, wallet_data=None, transaction_data=None):
                     "data": transaction_data
                 }
             )
-            logger.info(f"✅ Transaction update envoyé pour user {user.id}")
+            logger.info(f" Transaction update envoyé pour user {user.id}")
             
     except Exception as e:
-        logger.error(f"❌ Erreur envoi WebSocket: {e}")
+        logger.error(f" Erreur envoi WebSocket: {e}")
+        
+
+def clean_phone_number(phone_number: str) -> str:
+    """
+    Nettoie et formate un numéro au format +225xxxxxxxx
+    """
+    
+    cleaned = phone_number.replace(' ', '')
+
+    if cleaned.startswith('00225'):
+        cleaned = cleaned[5:]
+    elif cleaned.startswith('+225'):
+        cleaned = cleaned[4:]
+    elif cleaned.startswith('225'):
+        cleaned = cleaned[3:]
+
+    cleaned = ''.join(filter(str.isdigit, cleaned))
+
+    return '+225' + cleaned
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -223,6 +242,8 @@ def make_withdrawal(request):
             'success': False,
             'message': 'Erreur lors du retrait'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -233,20 +254,23 @@ def make_transfer(request):
         amount = Decimal(request.data.get('amount', '0'))
         message = request.data.get('message', '')
         
+        receiver_phone_clean = clean_phone_number(receiver_phone)
+        
+        logger.info(f"receiver_phone_clean: {receiver_phone_clean}")
+        
         if amount <= 0:
             return Response({
                 'success': False,
                 'message': 'Montant invalide'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Trouver le destinataire par téléphone
         try:
-            receiver = User.objects.get(phone_number=receiver_phone)
+            receiver = User.objects.get(phone_number=receiver_phone_clean)
         except User.DoesNotExist:
             return Response({
                 'success': False,
                 'message': 'Destinataire non trouvé'
-            }, status=status.HTTP_404_NOT_FOUND)
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         if receiver == request.user:
             return Response({
@@ -266,7 +290,6 @@ def make_transfer(request):
             
             sender_wallet.transfer(receiver_wallet, amount)
             
-            # Créer la transaction
             sanek_transaction = SanekTransaction.objects.create(
                 sender=request.user,
                 receiver=receiver,
@@ -275,12 +298,10 @@ def make_transfer(request):
                 operator='sanek'
             )
             
-            # Sérialiser les données
             sender_wallet_serializer = SanekWalletSerializer(sender_wallet)
             receiver_wallet_serializer = SanekWalletSerializer(receiver_wallet)
             transaction_serializer = SanekTransactionSerializer(sanek_transaction)
             
-            # Envoyer via WebSocket aux deux utilisateurs
             send_wallet_update(
                 request.user,
                 wallet_data=sender_wallet_serializer.data,

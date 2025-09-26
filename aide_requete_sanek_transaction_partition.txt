@@ -1,0 +1,36 @@
+DO $$ 
+DECLARE 
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE TABLE sanek_transaction (
+    id SERIAL,
+    uuid UUID NOT NULL DEFAULT gen_random_uuid(),
+    sender_id INT REFERENCES accounts_customuser(id),
+    receiver_id INT REFERENCES accounts_customuser(id),
+    operator VARCHAR(50),
+    amount DECIMAL(10,2),
+    transaction_type VARCHAR(10),
+    created_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (id, created_at),
+    UNIQUE (uuid, created_at)  
+) PARTITION BY RANGE (created_at);
+
+
+SELECT * FROM accounts_customuser;
+SELECT * FROM sanek_transaction;
+
+DO $$ 
+DECLARE year INT;
+BEGIN
+  FOR year IN 2025..2035 LOOP  -- Étendre jusqu'à 2035
+    EXECUTE format('CREATE TABLE sanek_transaction_%s PARTITION OF sanek_transaction FOR VALUES FROM (''%s-01-01'') TO (''%s-12-31'');', year, year, year);
+  END LOOP;
+END $$;
+
+
+
